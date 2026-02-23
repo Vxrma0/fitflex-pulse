@@ -6,6 +6,7 @@ import PoseVisualizer from "@/components/PoseVisualizer";
 import CalibrationStatus from "@/components/CalibrationStatus";
 import RepLog from "@/components/RepLog";
 import { useGymSimulation } from "@/hooks/useGymSimulation";
+import { Link } from "react-router-dom";
 
 const Index = () => {
   const {
@@ -47,6 +48,12 @@ const Index = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <Link
+              to="/live"
+              className="glass rounded-lg px-3 py-1.5 text-xs font-mono neon-text-cyan hover:bg-muted/30 transition-colors"
+            >
+              ⚡ Live Tracking
+            </Link>
             <div className="glass rounded-lg px-3 py-1.5">
               <span className="text-[10px] font-mono text-muted-foreground">
                 Exercise:{" "}
