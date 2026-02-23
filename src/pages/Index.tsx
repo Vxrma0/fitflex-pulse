@@ -7,6 +7,7 @@ import CalibrationStatus from "@/components/CalibrationStatus";
 import RepLog from "@/components/RepLog";
 import { useGymSimulation } from "@/hooks/useGymSimulation";
 import { Link } from "react-router-dom";
+import fitflexLogo from "@assets/LOGO_new_removebg-preview_1771871562548.png";
 
 const Index = () => {
   const {
@@ -35,9 +36,11 @@ const Index = () => {
         {/* Header */}
         <header className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-neon-pink/20 flex items-center justify-center">
-              <span className="text-xl">🏋️</span>
-            </div>
+            <img 
+              src={fitflexLogo} 
+              alt="FitFlex Logo" 
+              className="w-12 h-12 object-contain"
+            />
             <div>
               <h1 className="text-xl font-outfit font-bold neon-text-pink">
                 FitFlex Ultra
