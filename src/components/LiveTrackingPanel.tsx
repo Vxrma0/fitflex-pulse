@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useBle } from "@/hooks/useBle";
 import { RepDetector } from "@/lib/repDetector";
 import { uploadSession } from "@/services/sessionService";
-import fitflexLogo from "@assets/LOGO_new_removebg-preview_1771871562548.png";
+import fitflexLogo from "@assets/fitflex-logo.png";
 
 const LiveTrackingPanel = () => {
   const { deviceName, batteryPercent, lastPacket, connectionState, startScan, disconnect } = useBle();

@@ -63,6 +63,10 @@
     "vaul": "^0.9.9",
     "zod": "^3.25.76"
   },
+  "optionalDependencies": {
+    "@mediapipe/pose": "^0.10.0",
+    "@mediapipe/camera_utils": "^0.10.0"
+  },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@testing-library/jest-dom": "^6.6.0",

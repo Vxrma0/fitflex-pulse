@@ -3,11 +3,12 @@ import HeroRepCounter from "@/components/HeroRepCounter";
 import MetricCard from "@/components/MetricCard";
 import FeedbackBanner from "@/components/FeedbackBanner";
 import PoseVisualizer from "@/components/PoseVisualizer";
+import MediaPipeLiveTracker from "@/components/MediaPipeLiveTracker";
 import CalibrationStatus from "@/components/CalibrationStatus";
 import RepLog from "@/components/RepLog";
 import { useGymSimulation } from "@/hooks/useGymSimulation";
 import { Link } from "react-router-dom";
-import fitflexLogo from "@assets/LOGO_new_removebg-preview_1771871562548.png";
+import fitflexLogo from "@assets/fitflex-logo.png";
 
 const Index = () => {
   const {
@@ -78,9 +79,9 @@ const Index = () => {
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left: Pose Visualizer */}
+          {/* Left: Camera Pose Tracker (replaces exoskeleton) */}
           <div className="lg:col-span-4">
-            <PoseVisualizer isActive={isActive} formQuality={formQuality} />
+            <MediaPipeLiveTracker exercise="Bicep Curl" />
             <div className="mt-4">
               <CalibrationStatus isCalibrated={isCalibrated} />
             </div>
