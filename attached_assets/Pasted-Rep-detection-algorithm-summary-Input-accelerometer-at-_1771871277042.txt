@@ -1,0 +1,88 @@
+Rep detection algorithm summary
+
+Input: accelerometer at 50–100 Hz, gyroscope optional.
+
+Preprocess: resample, compute magnitude 
+𝑥
+2
++
+𝑦
+2
++
+𝑧
+2
+, low‑pass filter.
+
+State machine: idle → upstroke → top → downstroke → complete.
+
+Validation: amplitude threshold, min/max rep duration, debounce to avoid double counts.
+
+Set end: configurable idle timeout (default 8–12s) or manual End Set.
+
+Calibration: auto‑scale amplitude threshold from first 3 reps.
+
+Hardware
+
+Primary: BLE band with 3‑axis accel and gyro, 50–100 Hz sampling, battery reporting.
+
+Optional: 1080p@30fps camera for future gym installs; fixed mount and lighting guidelines.
+
+Privacy Security and Compliance
+Privacy rules
+
+No raw video stored by default.
+
+No face recognition or biometric identification.
+
+Consent required for motion tracking and analytics.
+
+Anonymization: aggregate metrics for analytics; user‑owned session data retained indefinitely unless user requests deletion.
+
+Security
+
+Use Firebase security rules to restrict writes to authenticated users.
+
+Secure Cloud Functions for receipt validation and admin analytics.
+
+Encrypt data in transit (HTTPS) and rely on platform storage protections.
+
+Regulatory
+
+Prepare consent flows and privacy policy for biometric/health data if camera mode is enabled later.
+
+Follow app store guidelines for subscriptions and in‑app purchases.
+
+Roadmap Milestones and Success Metrics
+Phase 0 Prototype (Weeks 0–2)
+
+BLE simulator, rep detector library, Live Tracking UI, local session persistence.
+
+Metric: rep detection works on CSV test data within ±1 rep.
+
+Phase 1 MVP (Weeks 3–8)
+
+Flutter app with BLE pairing, live rep counting, session upload to Firestore, subscription sandbox.
+
+Metric: ≥90% rep accuracy on controlled tests; set detection error <10%.
+
+Phase 2 Beta (Month 3)
+
+Beta with 50–100 users, crash monitoring, subscription flow live.
+
+Metric: retention ≥3 workouts/week for beta users; no data loss.
+
+Phase 3 Gym Pilot (Months 4–6)
+
+Optional camera hardware pilot in 1–2 gyms, analytics dashboard, revenue experiments.
+
+Metric: validated B2B pricing and per‑gym adoption interest.
+
+KPIs
+
+Accuracy: rep count ±1 rep per set.
+
+Reliability: session upload success rate ≥99%.
+
+Engagement: weekly active users and average workouts per user.
+
+Revenue: conversion rate from free trial to paid subscription.

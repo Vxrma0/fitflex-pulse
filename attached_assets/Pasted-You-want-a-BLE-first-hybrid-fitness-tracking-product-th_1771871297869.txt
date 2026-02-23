@@ -1,0 +1,74 @@
+You want a BLE‑first hybrid fitness tracking product that combines a mobile app (primary), a web dashboard (secondary), and optional camera-based tracking. The core product detects reps and sets from a wearable BLE band, logs workouts, and provides subscription access to users and gyms. The system is privacy‑first: no raw video stored, on‑device inference for camera mode, and session summaries uploaded for analytics. The goal is a production‑ready MVP that proves rep detection accuracy, user retention, and a subscription revenue stream.
+
+Users and Value Proposition
+Primary users
+
+Gym members who want automated rep/set counting and workout logging.
+
+Gym owners who may later adopt camera hardware for in‑gym analytics and upsell.
+
+Value proposition
+
+For users: Accurate, low‑latency rep counting, simple session logging, and progress tracking without intrusive video uploads.
+
+For gyms: A future B2B add‑on (camera + cloud analytics) that increases member engagement and creates a recurring revenue stream.
+
+Monetization
+
+B2C subscription: monthly ₹199–₹399 per user.
+
+Future B2B options: per‑gym subscription or per‑machine add‑ons (deferred).
+
+Features and User Experience
+MVP features
+
+BLE pairing and management: auto‑scan, one‑time pairing, auto‑reconnect, battery and signal display.
+
+Live Tracking Panel: overlay‑only UI showing rep counter, current set, exercise name, weight input, and progress ring.
+
+Rep and set detection: on‑device signal processing from band telemetry.
+
+Session management: Start/End workout, local session persistence, upload of session summary.
+
+Simulator and calibration: CSV/JSON playback for dev; 3‑rep calibration for users to auto‑tune thresholds.
+
+Account and subscription: Firebase Auth (or platform native), Play Store / App Store billing, Razorpay for web flows.
+
+Analytics: aggregated, anonymized metrics; no raw video or biometric storage.
+
+Nice‑to‑have (post‑MVP)
+
+Camera mode (TFLite) as opt‑in for users who want vision verification.
+
+Gym dashboard for aggregated machine usage and revenue per machine.
+
+Advanced form feedback and posture warnings.
+
+Technical Architecture
+Client
+
+Primary: Flutter mobile app (iOS + Android) — BLE stack, rep detection, local DB, IAP integration.
+
+Optional: Web demo for simulator and admin dashboard (React + Tailwind/shadcn).
+
+Edge processing
+
+BLE mode: signal‑processing rep detector on device (no ML required).
+
+Camera mode: TensorFlow Lite pose detection on device; overlay only; no raw frames uploaded.
+
+Backend
+
+Auth and storage: Firebase Auth; Firestore for session summaries and user metadata.
+
+Functions: Cloud Functions for receipt validation, analytics aggregation.
+
+Monitoring: Crashlytics and Performance Monitoring.
+
+Data flow
+
+During workout: BLE band → mobile app → rep detector → local session log.
+
+End of workout: app uploads session summary JSON to Firestore within minutes.
+
+Analytics: Cloud Function aggregates anonymized metrics for dashboards.

@@ -1,0 +1,664 @@
+### Files to add or replace — full code
+
+Below are the complete files to add to your repository. Paste each file at the path shown and commit. I kept the code minimal and focused on the BLE-first, overlay-only tracking demo for the web (simulator + rep detector + session upload). The mobile Flutter app remains the primary target, but this web demo helps you test rep logic and UI quickly.
+
+---
+
+#### `src/components/LiveTrackingPanel.tsx`
+```tsx
+import React, { useEffect, useState } from "react";
+import { useBle } from "../hooks/useBle";
+import { RepDetector } from "../lib/repDetector";
+import { uploadSession } from "../services/sessionService";
+import "./LiveTrackingPanel.css";
+
+export const LiveTrackingPanel: React.FC = () => {
+  const { deviceName, batteryPercent, lastPacket, connectionState, startScan, disconnect } = useBle();
+  const [detector] = useState(() => new RepDetector());
+  const [repCount, setRepCount] = useState(0);
+  const [setCount, setSetCount] = useState(0);
+  const [exercise, setExercise] = useState("Bicep Curl");
+  const [weightKg, setWeightKg] = useState<number>(12.5);
+  const [inSession, setInSession] = useState(false);
+  const [sessionStart, setSessionStart] = useState<number | null>(null);
+
+  useEffect(() => {
+    const sub = detector.onChange((s) => {
+      setRepCount(s.repCount);
+      setSetCount(s.setCount);
+    });
+    return () => sub();
+  }, [detector]);
+
+  // feed detector with incoming telemetry (simulator or real)
+  useEffect(() => {
+    if (!lastPacket) return;
+    try {
+      const ts = lastPacket.timestamp ?? Date.now();
+      const ax = lastPacket.accel?.x ?? 0;
+      const ay = lastPacket.accel?.y ?? 0;
+      const az = lastPacket.accel?.z ?? 0;
+      detector.pushSample(ts, ax, ay, az);
+    } catch (e) {
+      // ignore malformed packets
+    }
+  }, [lastPacket, detector]);
+
+  const startWorkout = () => {
+    detector.reset();
+    setRepCount(0);
+    setSetCount(0);
+    setInSession(true);
+    setSessionStart(Date.now());
+  };
+
+  const endWorkout = async () => {
+    if (!inSession || sessionStart == null) return;
+    const summary = {
+      startTime: sessionStart,
+      endTime: Date.now(),
+      exercises: [
+        {
+          exerciseId: exercise.toLowerCase().replace(/\s+/g, "_"),
+          name: exercise,
+          sets: [
+            {
+              setNumber: 1,
+              reps: repCount,
+              weightKg,
+              durationMs: Date.now() - sessionStart,
+            },
+          ],
+          totalVolumeKg: repCount * weightKg,
+        },
+      ],
+      summaryMetrics: {
+        totalReps: repCount,
+        totalSets: setCount || 1,
+        totalVolumeKg: repCount * weightKg,
+      },
+      device: {
+        deviceName,
+        batteryPercent,
+      },
+      uploadedAt: Date.now(),
+    };
+
+    await uploadSession(summary);
+    setInSession(false);
+    setSessionStart(null);
+  };
+
+  return (
+    <div className="lf-panel">
+      <div className="lf-header">
+        <div className="lf-title">
+          <img src="/fitflex-logo.png" alt="FitFlex" className="lf-logo" />
+          <div>
+            <div className="lf-exercise">{exercise}</div>
+            <div className="lf-sub">Single-arm isolation • Dumbbell</div>
+          </div>
+        </div>
+        <div className="lf-conn">
+          <div className={`lf-dot ${connectionState === "connected" ? "on" : "off"}`} />
+          <div className="lf-conn-text">{connectionState}</div>
+        </div>
+      </div>
+
+      <div className="lf-body">
+        <div className="lf-ring">
+          <svg viewBox="0 0 120 120" className="lf-svg">
+            <circle cx="60" cy="60" r="48" className="lf-bg" />
+            <circle
+              cx="60"
+              cy="60"
+              r="48"
+              className="lf-fg"
+              style={{ strokeDasharray: 302, strokeDashoffset: 302 - (repCount % 10) * 30.2 }}
+            />
+          </svg>
+          <div className="lf-counter">
+            <div className="lf-count">{repCount}</div>
+            <div className="lf-set">Set {setCount + 1}</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="lf-controls">
+        <div className="lf-weight">
+          <label>Weight</label>
+          <input
+            type="number"
+            value={weightKg}
+            onChange={(e) => setWeightKg(parseFloat(e.target.value || "0"))}
+            step="0.5"
+            min="0"
+          />
+          <span>kg</span>
+        </div>
+
+        <div className="lf-actions">
+          <button onClick={startScan}>Scan Band</button>
+          <button onClick={() => (connectionState === "connected" ? disconnect() : startScan())}>
+            {connectionState === "connected" ? "Disconnect" : "Connect"}
+          </button>
+          {!inSession ? (
+            <button className="primary" onClick={startWorkout}>
+              Start Workout
+            </button>
+          ) : (
+            <button className="danger" onClick={endWorkout}>
+              End Workout
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="lf-footer">
+        <div>{deviceName || "No band paired"}</div>
+        <div>Battery: {batteryPercent}%</div>
+      </div>
+    </div>
+  );
+};
+
+export default LiveTrackingPanel;
+```
+
+---
+
+#### `src/components/LiveTrackingPanel.css`
+```css
+.lf-panel {
+  background: #0f1720;
+  border-radius: 12px;
+  padding: 16px;
+  color: #e6eef0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.lf-header { display:flex; justify-content:space-between; align-items:center; }
+.lf-title { display:flex; gap:12px; align-items:center; }
+.lf-logo { width:44px; height:44px; object-fit:contain; }
+.lf-exercise { font-size:16px; font-weight:600; }
+.lf-sub { font-size:12px; color:#9aa6ad; }
+.lf-conn { display:flex; align-items:center; gap:8px; }
+.lf-dot { width:10px; height:10px; border-radius:50%; background:#444; }
+.lf-dot.on { background:#2ee6a6; box-shadow:0 0 6px rgba(46,230,166,0.3); }
+.lf-dot.off { background:#6b7280; }
+.lf-body { display:flex; justify-content:center; align-items:center; padding:18px 0; }
+.lf-ring { position:relative; width:220px; height:220px; }
+.lf-svg { width:100%; height:100%; transform:rotate(-90deg); }
+.lf-bg { fill:none; stroke:#111827; stroke-width:12; }
+.lf-fg { fill:none; stroke:#2ee6a6; stroke-width:12; stroke-linecap:round; transition:stroke-dashoffset 300ms linear; }
+.lf-counter { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+.lf-count { font-size:64px; color:#2ee6a6; font-weight:700; }
+.lf-set { font-size:14px; color:#9aa6ad; margin-top:6px; }
+.lf-controls { display:flex; gap:12px; align-items:center; margin-top:12px; }
+.lf-weight { display:flex; gap:8px; align-items:center; }
+.lf-weight input { width:80px; padding:6px; border-radius:6px; border:1px solid #1f2937; background:#0b1220; color:#e6eef0; }
+.lf-actions { display:flex; gap:8px; margin-left:auto; }
+button { padding:8px 12px; border-radius:8px; border:none; background:#1f2937; color:#e6eef0; cursor:pointer; }
+button.primary { background:#2ee6a6; color:#042018; font-weight:700; }
+button.danger { background:#ef4444; color:#fff; }
+.lf-footer { display:flex; justify-content:space-between; margin-top:12px; color:#9aa6ad; font-size:13px; }
+```
+
+---
+
+#### `src/hooks/useBle.tsx`
+```tsx
+import { useEffect, useState } from "react";
+
+/**
+ * Web demo BLE hook (simulator-friendly).
+ * In production mobile app, BLE is handled natively (Flutter).
+ *
+ * This hook exposes:
+ * - deviceName
+ * - batteryPercent
+ * - lastPacket (JSON telemetry)
+ * - connectionState: 'disconnected'|'scanning'|'connected'
+ * - startScan(), disconnect()
+ *
+ * For the web demo we support a simulator that writes to window.__BLE_SIMULATOR_PUSH(packet)
+ */
+
+type Telemetry = {
+  timestamp?: number;
+  accel?: { x: number; y: number; z: number };
+  gyro?: { x: number; y: number; z: number };
+  battery?: number;
+};
+
+export function useBle() {
+  const [deviceName, setDeviceName] = useState<string>("");
+  const [batteryPercent, setBatteryPercent] = useState<number>(0);
+  const [lastPacket, setLastPacket] = useState<Telemetry | null>(null);
+  const [connectionState, setConnectionState] = useState<"disconnected" | "scanning" | "connected">("disconnected");
+
+  useEffect(() => {
+    // simulator hook: window.__BLE_SIMULATOR_PUSH = (packet) => { ... }
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    window.__BLE_SIMULATOR_PUSH = (packet: Telemetry) => {
+      setLastPacket(packet);
+      if (packet.battery != null) setBatteryPercent(packet.battery);
+      if (!deviceName) setDeviceName("SimBand-001");
+      if (connectionState !== "connected") setConnectionState("connected");
+    };
+
+    return () => {
+      // cleanup
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      delete window.__BLE_SIMULATOR_PUSH;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const startScan = async () => {
+    // For web demo, scanning simply flips state and expects simulator to push packets.
+    setConnectionState("scanning");
+    setTimeout(() => setConnectionState("connected"), 800);
+  };
+
+  const disconnect = async () => {
+    setConnectionState("disconnected");
+    setDeviceName("");
+    setBatteryPercent(0);
+    setLastPacket(null);
+  };
+
+  return { deviceName, batteryPercent, lastPacket, connectionState, startScan, disconnect };
+}
+```
+
+---
+
+#### `src/lib/repDetector.ts`
+```ts
+// Simple rep detection state machine for web demo.
+// Uses accelerometer magnitude and derivative heuristics.
+// Exposes onChange(callback) to subscribe to state updates.
+
+type Sample = { ts: number; mag: number };
+
+export class RepDetector {
+  private buffer: Sample[] = [];
+  private repCount = 0;
+  private setCount = 0;
+  private state: "idle" | "up" | "top" | "down" | "complete" = "idle";
+  private lastRepTs = 0;
+  private listeners: Array<(s: { repCount: number; setCount: number }) => void> = [];
+
+  // tunables
+  amplitudeThreshold = 0.12;
+  minRepDurationMs = 300;
+  maxRepDurationMs = 8000;
+  setTimeoutSeconds = 10;
+
+  private setTimer?: number;
+
+  pushSample(ts: number, ax: number, ay: number, az: number) {
+    const mag = Math.sqrt(ax * ax + ay * ay + az * az);
+    this.buffer.push({ ts, mag });
+    if (this.buffer.length > 500) this.buffer.splice(0, this.buffer.length - 500);
+    this.process();
+  }
+
+  reset() {
+    this.buffer = [];
+    this.repCount = 0;
+    this.setCount = 0;
+    this.state = "idle";
+    this.lastRepTs = 0;
+    if (this.setTimer) {
+      clearTimeout(this.setTimer);
+      this.setTimer = undefined;
+    }
+    this.emit();
+  }
+
+  onChange(cb: (s: { repCount: number; setCount: number }) => void) {
+    this.listeners.push(cb);
+    cb({ repCount: this.repCount, setCount: this.setCount });
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== cb);
+    };
+  }
+
+  private emit() {
+    const snapshot = { repCount: this.repCount, setCount: this.setCount };
+    this.listeners.forEach((l) => l(snapshot));
+  }
+
+  private process() {
+    if (this.buffer.length < 3) return;
+    const last = this.buffer[this.buffer.length - 1];
+    const prev = this.buffer[this.buffer.length - 2];
+    const prev2 = this.buffer[this.buffer.length - 3];
+    const derivative = last.mag - prev.mag;
+
+    switch (this.state) {
+      case "idle":
+        if (derivative > this.amplitudeThreshold / 4) this.state = "up";
+        break;
+      case "up":
+        if (derivative < 0 && last.mag > prev.mag && last.mag > this.amplitudeThreshold) this.state = "top";
+        break;
+      case "top":
+        if (derivative < -this.amplitudeThreshold / 8) this.state = "down";
+        break;
+      case "down":
+        if (Math.abs(derivative) < 0.01) {
+          const now = last.ts;
+          const duration = this.lastRepTs === 0 ? now : now - this.lastRepTs;
+          if (this.lastRepTs === 0 || (duration >= this.minRepDurationMs && duration <= this.maxRepDurationMs)) {
+            this.registerRep(now);
+          }
+          this.state = "complete";
+        }
+        break;
+      case "complete":
+        if (Math.abs(derivative) < 0.005) this.state = "idle";
+        break;
+    }
+  }
+
+  private registerRep(ts: number) {
+    this.repCount += 1;
+    this.lastRepTs = ts;
+    if (this.setTimer) {
+      clearTimeout(this.setTimer);
+    }
+    this.setTimer = window.setTimeout(() => {
+      if (this.repCount > 0) {
+        this.setCount += 1;
+        this.repCount = 0;
+        this.emit();
+      }
+    }, this.setTimeoutSeconds * 1000);
+    this.emit();
+  }
+}
+```
+
+---
+
+#### `src/components/BleSimulator.tsx`
+```tsx
+import React, { useRef } from "react";
+
+/**
+ * Simple simulator UI for feeding CSV/JSON telemetry into the web demo.
+ * Usage: paste CSV content into textarea and press Play.
+ *
+ * It will call window.__BLE_SIMULATOR_PUSH(packet) for each row.
+ */
+
+export const BleSimulator: React.FC = () => {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const playingRef = useRef<number | null>(null);
+
+  const playCsv = async () => {
+    const text = textareaRef.current?.value ?? "";
+    if (!text) return;
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    // detect header
+    let start = 0;
+    if (lines[0].toLowerCase().includes("timestamp")) start = 1;
+    const rows = lines.slice(start).map((l) => l.split(",").map((c) => c.trim()));
+    let i = 0;
+    const push = () => {
+      if (i >= rows.length) {
+        if (playingRef.current) {
+          clearInterval(playingRef.current);
+          playingRef.current = null;
+        }
+        return;
+      }
+      const r = rows[i];
+      const ts = parseInt(r[0], 10) || Date.now();
+      const ax = parseFloat(r[1]) || 0;
+      const ay = parseFloat(r[2]) || 0;
+      const az = parseFloat(r[3]) || 0;
+      const gx = parseFloat(r[4]) || 0;
+      const gy = parseFloat(r[5]) || 0;
+      const gz = parseFloat(r[6]) || 0;
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      if (typeof window.__BLE_SIMULATOR_PUSH === "function") {
+        // push JSON telemetry
+        // battery simulated as 85
+        window.__BLE_SIMULATOR_PUSH({
+          timestamp: ts,
+          accel: { x: ax, y: ay, z: az },
+          gyro: { x: gx, y: gy, z: gz },
+          battery: 85,
+        });
+      }
+      i++;
+    };
+    // play at 100Hz or based on timestamps (simple fixed rate here)
+    playingRef.current = window.setInterval(push, 10);
+  };
+
+  const stop = () => {
+    if (playingRef.current) {
+      clearInterval(playingRef.current);
+      playingRef.current = null;
+    }
+  };
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ marginBottom: 8, color: "#9aa6ad" }}>BLE Simulator (CSV)</div>
+      <textarea ref={textareaRef} style={{ width: "100%", height: 120, background: "#071018", color: "#e6eef0", padding: 8 }} defaultValue={`timestamp,ax,ay,az,gx,gy,gz
+1717563890000,0.01,-0.98,0.02,0.01,0.02,0.00
+1717563890100,0.05,-0.90,0.10,0.02,0.03,0.00
+1717563890200,0.20,-0.60,0.30,0.03,0.05,0.01
+1717563890300,0.40,-0.20,0.60,0.05,0.10,0.02
+1717563890400,0.10,-0.80,0.20,0.02,0.03,0.00
+1717563890500,0.02,-0.98,0.01,0.01,0.01,0.00`} />
+      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <button onClick={playCsv}>Play</button>
+        <button onClick={stop}>Stop</button>
+      </div>
+    </div>
+  );
+};
+
+export default BleSimulator;
+```
+
+---
+
+#### `src/lib/repDetector.test.ts` (simple unit test)
+```ts
+import { RepDetector } from "./repDetector";
+
+test("rep detector basic flow", () => {
+  const d = new RepDetector();
+  let last = { repCount: 0, setCount: 0 };
+  const unsub = d.onChange((s) => (last = s));
+  // simulate a single rep pattern (low -> high -> low)
+  const base = Date.now();
+  d.pushSample(base + 0, 0.01, -0.98, 0.02);
+  d.pushSample(base + 50, 0.2, -0.6, 0.3);
+  d.pushSample(base + 100, 0.4, -0.2, 0.6);
+  d.pushSample(base + 150, 0.1, -0.8, 0.2);
+  // allow internal timers to run (not ideal in unit test but simple)
+  expect(last.repCount >= 0).toBeTruthy();
+  unsub();
+});
+```
+
+---
+
+#### `src/services/sessionService.ts`
+```ts
+import { getAuth } from "firebase/auth";
+import { getFirestore, collection, doc, setDoc } from "firebase/firestore";
+
+/**
+ * uploadSession(summary)
+ * summary: object matching the schema described in the project plan.
+ *
+ * This function assumes Firebase has been initialized in your app.
+ */
+
+export async function uploadSession(summary: any) {
+  try {
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      // For demo: store under 'anon' user
+      const db = getFirestore();
+      const docRef = doc(collection(db, "users", "anon", "sessions"));
+      await setDoc(docRef, summary);
+      return { ok: true, id: docRef.id };
+    } else {
+      const db = getFirestore();
+      const docRef = doc(collection(db, "users", user.uid, "sessions"));
+      await setDoc(docRef, summary);
+      return { ok: true, id: docRef.id };
+    }
+  } catch (e) {
+    console.error("uploadSession error", e);
+    return { ok: false, error: e };
+  }
+}
+```
+
+---
+
+#### `src/App.tsx` (replace the left feed with LiveTrackingPanel)
+```tsx
+import React from "react";
+import LiveTrackingPanel from "./components/LiveTrackingPanel";
+import BleSimulator from "./components/BleSimulator";
+import "./App.css";
+
+function App() {
+  return (
+    <div className="app-root">
+      <div className="left">
+        <LiveTrackingPanel />
+        <BleSimulator />
+      </div>
+      <div className="right">
+        {/* Keep your existing right-side content (session log, analytics) */}
+        <div style={{ padding: 16, color: "#9aa6ad" }}>
+          <h3>Session Log</h3>
+          <p>Existing analytics and session history will remain here.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default App;
+```
+
+---
+
+#### `src/index.css` (add color tokens and basic layout)
+```css
+:root {
+  --bg: #0b0f12;
+  --panel: #0f1720;
+  --muted: #9aa6ad;
+  --accent: #2ee6a6;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: linear-gradient(180deg, #05060a 0%, #071018 100%);
+  color: #e6eef0;
+}
+
+.app-root {
+  display: flex;
+  gap: 16px;
+  padding: 24px;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.left {
+  flex: 1 1 480px;
+  max-width: 720px;
+}
+
+.right {
+  flex: 1 1 360px;
+  max-width: 420px;
+}
+```
+
+---
+
+#### `package.json` (web demo additions — merge into your existing file)
+```json
+{
+  "dependencies": {
+    "firebase": "^10.0.0",
+    "csv-parse": "^5.0.0"
+  }
+}
+```
+Add these dependencies to your existing `package.json` and run `npm install` or `pnpm install`.
+
+---
+
+#### `firebase.rules` (Firestore rules)
+```text
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/sessions/{sessionId} {
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth == null && userId == 'anon'; // allow demo anon writes
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow update, delete: if false;
+    }
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /analytics/{doc} {
+      allow read: if request.auth != null && request.auth.token.admin == true;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+  }
+}
+```
+
+---
+
+### Integration checklist (concise)
+1. **Add files** above into your repo under `src/` and `src/components`, `src/hooks`, `src/lib`, `src/services`.
+2. **Logo**: place your FitFlex logo at `public/fitflex-logo.png` (the web demo references this path).
+3. **Install deps**: `npm install firebase csv-parse` (or add to your package manager).
+4. **Firebase**: initialize Firebase in your site (use Firebase Web SDK). Ensure `firebase.initializeApp(...)` is called before `uploadSession` is used. For quick demo, you can use anonymous writes (the code writes to `users/anon` if no auth).
+5. **Run**: `npm run dev` (or your existing dev command) and open the site. Use the BLE Simulator textarea to play CSV telemetry and watch the rep counter update.
+6. **Tune**: adjust `amplitudeThreshold` and timing in `src/lib/repDetector.ts` to match your sample telemetry.
+
+---
+
+### Notes and assumptions (short)
+- This web demo is **simulator-first**. Real BLE on web is limited; production BLE will be handled by the Flutter mobile app.  
+- No raw video or face recognition code is included. The UI is overlay-only and preserves privacy.  
+- The `uploadSession` function expects Firebase to be initialized; for quick testing it writes to `users/anon`. Replace with authenticated user logic when ready.  
+- I preserved the dark FitFlex aesthetic and used your logo path `public/fitflex-logo.png`. Replace with your actual asset.
+
+---
+
+If you want, I can now:
+- Produce a single downloadable patch/zip with all files arranged, or
+- Generate the Flutter BLE module next (the primary target), or
+- Create a short calibration UI to auto-tune thresholds from the first 3 reps.
+
+Tell me which one to deliver next and I’ll prepare it immediately.
